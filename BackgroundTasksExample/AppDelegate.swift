@@ -6,14 +6,27 @@
 //
 
 import UIKit
+import BackgroundTasks
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
+    let taskID = "test.BackgroundTasksExample.backgroundTask"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+
+        //Register Task
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID, using: nil) { task in
+            guard let task = task as? BGAppRefreshTask else { return }
+            self.registerTask(task: task)
+        }
+        let count = UserDefaults.standard.integer(forKey: "background_task_count")
+        print("task ran \(count) times")
+        scheduled()
+        //SubmitTask
+        //handle tasks when its run
         return true
     }
 
@@ -34,3 +47,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 }
 
+//e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"test.BackgroundTasksExample.backgroundTask"]
+
+
+// MARK: Background Tasks Functions
+extension AppDelegate {
+
+    func registerTask(task: BGAppRefreshTask) {
+        let count = UserDefaults.standard.integer(forKey: "background_task_count")
+        UserDefaults.standard.setValue(count+1, forKey: "background_task_count")
+    }
+
+    func scheduled() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskID)
+        BGTaskScheduler.shared.getPendingTaskRequests { tasks in
+            print("\(tasks.count) is pending ....")
+            
+            guard tasks.isEmpty else {
+                print("there is uncompleted tasks")
+                return
+            }
+
+            do {
+                let newTask = BGAppRefreshTaskRequest(identifier: self.taskID)
+                newTask.earliestBeginDate = Date().addingTimeInterval(86000 * 3)
+                try BGTaskScheduler.shared.submit(newTask)
+                print("scheduled")
+            } catch {
+                print("error on submitting => \(error)")
+            }
+        }
+    }
+}
